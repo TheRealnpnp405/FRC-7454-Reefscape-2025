@@ -1,0 +1,163 @@
+package frc.robot;
+
+public class DriveByLime_OLD extends Robot {
+    private static boolean stepDone = false;
+    private static double raw_speed;
+
+    /**
+     * Gets the current Limelight Z distance.
+     */
+    public static double getLimeZ() {
+        var calcs1 = LimelightHelpers.getTargetPose3d_RobotSpace("limelight");
+        double z = calcs1.getZ();
+        return z;
+    }
+
+    /**
+     * Gets the current Limelight 2d TX pose.
+     */
+    public static double getLimeTX() {
+        return LimelightHelpers.getTX("limelight");
+    }
+
+    /**
+     * This function Will auto aim the robot at the closest AprilTag
+     */
+    public static void autoPose() {
+        if (getLimeTX() <= 3 && getLimeTX() >= -3) {
+            Drive_Main.tankDrive(0, 0);
+        } else if (getLimeTX() <= 0) {
+            raw_speed = (0.03 * (Math.abs(getLimeTX()))); // Initial speed calculation
+            if (raw_speed > 0.13 && getLimeTX() > -10) { // Check to ensure speed is not exceeding 10% when close to
+                                                         // point
+                Drive_Main.tankDrive(0.13, -0.13);
+            } else if (raw_speed > 0.225) {
+                Drive_Main.tankDrive(0.225, -0.225);
+            } else {
+                Drive_Main.tankDrive(raw_speed, -1 * raw_speed);
+            }
+        } else if (getLimeTX() >= 0) {
+            raw_speed = (0.03 * (Math.abs(getLimeTX()))); // Initial speed calculation
+            if (raw_speed > 0.13 && getLimeTX() < 10) { // Check to ensure speed is not exceeding 10% when close to
+                                                        // point
+                Drive_Main.tankDrive(-0.13, 0.13);
+            } else if (raw_speed > 0.225) {
+                Drive_Main.tankDrive(-0.225, 0.225);
+            } else {
+                Drive_Main.tankDrive(-1 * raw_speed, raw_speed);
+            }
+        }
+    }
+
+    private static double lastTX = 0;
+
+    /**
+     * This function will follow a person or object that has an AprilTag attached to
+     * it.
+     * 
+     * @param speed    = the max speed to drive the robot forward.
+     * @param distance = the minimum distance at which the robot get to the
+     *                 AprilTag.
+     * @param ID       = The AprilTag ID to track.
+     */
+    public static void AutoDriveFollower_Autonomous(double speed, double distance, double ID) {
+        stepDone = false;
+        speed = speed * -1;
+        double max1 = .02;
+        double max2 = .04;
+        while (!stepDone) {
+            if (!(getLimeTX() == 0) && LimelightHelpers.getFiducialID("limelight") == ID) {
+                lastTX = getLimeTX();
+            }
+
+            if (getLimeZ() > distance && LimelightHelpers.getFiducialID("limelight") == ID) {
+                if (getLimeTX() <= 3 && getLimeTX() >= -3 && !(getLimeZ() == 0)) { // APPROACH TARGET
+                    Drive_Main.tankDrive(speed, speed);
+                } else if (getLimeTX() <= 0) {
+                    raw_speed = (0.03 * (Math.abs(getLimeTX()))); // Initial speed calculation
+                    if (raw_speed > max1 && getLimeTX() > -10) { // Check to ensure speed is not exceeding 10% when
+                                                                 // close to point
+                        Drive_Main.tankDrive(max1 + speed, (-1 * max1) + speed);
+                    } else if (raw_speed > max2) {
+                        Drive_Main.tankDrive(max2 + speed, (-1 * max2) + speed);
+                    } else {
+                        Drive_Main.tankDrive(speed + raw_speed, speed + (-1 * raw_speed));
+                    }
+                } else if (getLimeTX() >= 0) {
+                    raw_speed = (0.03 * (Math.abs(getLimeTX()))); // Initial speed calculation
+                    if (raw_speed > max1 && getLimeTX() < 10) { // Check to ensure speed is not exceeding 10% when close
+                                                                // to point
+                        Drive_Main.tankDrive((-1 * max1) + speed, max1 + speed);
+                    } else if (raw_speed > max2) {
+                        Drive_Main.tankDrive((-1 * max2) + speed, max2 + speed);
+                    } else {
+                        Drive_Main.tankDrive(speed + (-1 * raw_speed), speed + raw_speed);
+                    }
+                }
+                stepDone = false;
+
+            } else if (getLimeZ() <= distance && LimelightHelpers.getFiducialID("limelight") == ID // TASK COMPLETED
+                    && !(getLimeZ() == 0)) {
+                Drive_Main.stopMotor();
+                autoPose();
+                stepDone = true;
+
+            } else if (getLimeZ() == 0 || !(LimelightHelpers.getFiducialID("limelight") == ID)) { // FIND MISSING TAG
+                if (lastTX > 0) {
+                    Drive_Main.tankDrive(-0.25, 0.25);
+                    stepDone = false;
+                } else {
+                    Drive_Main.tankDrive(0.25, -0.25);
+                    stepDone = false;
+                }
+                for (int i = 0; i < 5001
+                        && (getLimeZ() == 0 || !(LimelightHelpers.getFiducialID("limelight") == ID)); i++) {
+                    wait(1);
+                    if (i == 5000) { // IF NO TAG CANCEL ROUTINE
+                        stepDone = true;
+                    }
+                }
+            } else {
+                Drive_Main.tankDrive(0, 0);
+                stepDone = false;
+            }
+        }
+    }
+
+    public static boolean autoTestDone = false;
+
+    public static void AutoDriveSequenceHandler() {
+        AutoDriveFollower_Autonomous(.525, 1.5, 6);
+        for (int i = 0; i < 3000 && (getLimeZ() == 0 || !(LimelightHelpers.getFiducialID("limelight") == 9)); i++) {
+            Drive_Main.tankDrive(-0.27, 0.27);
+            wait(1);
+        }
+        AutoDriveFollower_Autonomous(.525, 2, 9);
+        for (int i = 0; i < 3000 && (getLimeZ() == 0 || !(LimelightHelpers.getFiducialID("limelight") == 7)); i++) {
+            Drive_Main.tankDrive(0.27, -0.27);
+            wait(1);
+        }
+        AutoDriveFollower_Autonomous(.525, 1.5, 7);
+        for (int i = 0; i < 3000 && (getLimeZ() == 0 || !(LimelightHelpers.getFiducialID("limelight") == 8)); i++) {
+            Drive_Main.tankDrive(-0.27, 0.27);
+            wait(1);
+        }
+        AutoDriveFollower_Autonomous(.525, 1.5, 8);
+        for (int i = 0; i < 3000 && (getLimeZ() == 0 || !(LimelightHelpers.getFiducialID("limelight") == 10)); i++) {
+            Drive_Main.tankDrive(-0.27, 0.27);
+            wait(1);
+        }
+        AutoDriveFollower_Autonomous(.525, 1.5, 10);
+        for (int i = 0; i < 3000 && (getLimeZ() == 0 || !(LimelightHelpers.getFiducialID("limelight") == 14)); i++) {
+            Drive_Main.tankDrive(-0.27, 0.27);
+            wait(1);
+        }
+        AutoDriveFollower_Autonomous(.525, 1.7, 14);
+        for (int i = 0; i < 3000 && (getLimeZ() == 0 || !(LimelightHelpers.getFiducialID("limelight") == 6)); i++) {
+            Drive_Main.tankDrive(-0.32, 0.32);
+            wait(1);
+        }
+        Drive_Main.tankDrive(0, 0);
+        autoTestDone = true;
+    }
+}
